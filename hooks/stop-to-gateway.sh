@@ -27,17 +27,47 @@ if [[ -z "$transcript_path" || ! -f "$transcript_path" ]]; then
   exit 0
 fi
 
-# Find the last assistant message.id, then concatenate all text content
-# blocks belonging to that message. The transcript JSONL represents each
-# content block as a separate line; blocks from one turn share .message.id.
-text=$(jq -sr '
-  map(select(.type == "assistant")) as $a
-  | ($a | last | .message.id) as $mid
-  | $a
-  | map(select(.message.id == $mid))
-  | map(.message.content[] | select(.type == "text") | .text)
-  | join("")
-' "$transcript_path" 2>>"$LOG_FILE")
+# Concatenate every assistant text block emitted since the most recent
+# real user turn. Keying on the last .message.id (as we used to) is
+# unreliable: a single user turn spans multiple API responses (one per
+# tool cycle), each with its own message.id, and if the last one carries
+# only thinking/tool_use blocks — or the transcript writer hasn't flushed
+# the final text block yet when Stop fires — the extract comes back empty
+# and the gateway pairs an empty reply with the inbound, so Slack sees
+# nothing. "Real" user turns exclude tool_result entries (which also land
+# as type=="user" in the transcript JSONL).
+#
+# Retry the extract a few times if it comes back empty: the final text
+# block may not have been flushed to the JSONL when Stop fires. Past
+# turns hit this — three of four in the 6bf8e75a session — so waiting
+# briefly beats posting empty and losing the reply.
+extract_text() {
+  jq -sr '
+    . as $all
+    | ($all
+       | to_entries
+       | map(select(
+           .value.type == "user"
+           and (
+             ((.value.message.content | type) == "string")
+             or ((.value.message.content | type) == "array"
+                 and (.value.message.content[0].type // "") != "tool_result")
+           )
+         ))
+       | last | .key // -1) as $cut
+    | $all[$cut+1:]
+    | map(select(.type == "assistant"))
+    | map(.message.content[]? | select(.type == "text") | .text)
+    | join("")
+  ' "$transcript_path" 2>>"$LOG_FILE"
+}
+
+text=$(extract_text)
+for delay in 0.2 0.5 1.0; do
+  [[ -n "$text" ]] && break
+  sleep "$delay"
+  text=$(extract_text)
+done
 
 if [[ -z "$text" ]]; then
   # Still POST an empty reply. The gateway's pending queue must advance

@@ -37,6 +37,12 @@ final reply is posted back into the same Slack thread.
    - **Subscribe to bot events:** add `app_mention`. Add `message.im`
      if you also want DMs.
    - Reinstall the app if Slack asks you to.
+6. **App Home → Show Tabs → Messages Tab.** Enable the tab *and* tick
+   **"Allow users to send Slash commands and messages from the messages
+   tab."** Without this, the DM composer is disabled and Slack shows
+   *"Sending messages to this app has been turned off"* (localized — e.g.
+   PT: *"O envio de mensagens para esse app foi desativado"*) when a user
+   opens a DM with the bot. Reinstall if Slack asks you to.
 
 ## 2. Configure env vars
 
@@ -122,6 +128,10 @@ Common issues:
 
 - **`[slack] rejected: bad signature`** — your `SLACK_SIGNING_SECRET`
   is wrong, or your tunnel is rewriting headers.
+- **DM composer shows *"Sending messages to this app has been turned
+  off"*** (PT: *"O envio de mensagens para esse app foi desativado"*) —
+  enable the Messages Tab in **App Home** and tick "Allow users to send
+  Slash commands and messages from the messages tab" (step 1.6 above).
 - **`chat.postMessage failed: ... invalid_auth`** — your
   `SLACK_BOT_TOKEN` is wrong, or the bot has no scopes.
 - **Gateway healthy but session never replies** — the session isn't

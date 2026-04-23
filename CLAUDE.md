@@ -21,16 +21,26 @@ SSE. You do not post the reply yourself — just answer.
 If no gateway monitor is currently running in this session, start one. Use the
 `Monitor` tool with:
 
-- `command`: `tail -n 0 -F "$CLAUDE_PROJECT_DIR/logs/gateway.stdout.log" | grep --line-buffered '^INBOUND '`
+- `command`: `tail -n 0 -F "$(pwd)/logs/gateway.stdout.log" | grep --line-buffered '^INBOUND '`
 - `description`: `awc gateway inbound messages`
 - `persistent`: `true`
 
-Critical: **do not run `node gateway.js` from the Monitor**. The gateway is
-already started by `start.sh` and is listening on port 9511 — launching a
-second instance fails immediately with EADDRINUSE and the session stops
-receiving events silently. Always tail the existing stdout log instead.
-`-n 0` starts at end-of-file so previously-delivered messages are not
-replayed on session restart; `-F` follows by name across log rotation.
+Critical:
+
+- **Do not use `$CLAUDE_PROJECT_DIR`** in the Monitor command. That variable is
+  substituted by Claude Code only in hook definitions (and similar config
+  surfaces); the Monitor tool spawns a plain subshell where it is unset,
+  so `"$CLAUDE_PROJECT_DIR/logs/..."` expands to `/logs/...` and `tail -F`
+  silently waits forever on a nonexistent path. Use `$(pwd)` — the session's
+  cwd is the project root (that's how `.claude/settings.json` is picked up).
+  After starting the monitor, verify with `ps -ef | grep "tail -F" | grep -v grep`
+  that the path is absolute and correct.
+- **Do not run `node gateway.js` from the Monitor**. The gateway is already
+  started by `start.sh` and is listening on port 9511 — launching a second
+  instance fails immediately with EADDRINUSE and the session stops
+  receiving events silently. Always tail the existing stdout log instead.
+  `-n 0` starts at end-of-file so previously-delivered messages are not
+  replayed on session restart; `-F` follows by name across log rotation.
 
 If `curl -sf http://127.0.0.1:9511/health` fails, tell the user the gateway is
 down — do not try to start it from inside this session.
