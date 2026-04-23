@@ -1,0 +1,15 @@
+{
+  "name": "awc-gateway-slack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWC seed composition: stateless gateway + Slack channel for a long-lived Claude Code session",
+  "scripts": {
+    "gateway": "node gateway.js",
+    "slack": "node slack-adapter.js",
+    "start": "./start.sh",
+    "stop": "./stop.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
